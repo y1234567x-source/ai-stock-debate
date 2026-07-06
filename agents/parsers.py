@@ -68,11 +68,22 @@ def _fallback_verdict(text: str) -> str:
     return "查看详情"
 
 
+# verdict 是头部徽章用的短标签，不是段落。即便正则/兜底抓到一整行，也在此
+# 统一截断，避免像 D 的"结论是否维持：[维持，理由：……]"整段塞进徽章、把
+# 卡片标题挤成竖排单字。CSS 侧也有 ellipsis 兜底，双重保险。
+VERDICT_MAX_LEN = 28
+
+
+def _clip_verdict(v: str) -> str:
+    v = (v or "").strip().strip("[]【】").strip()
+    return (v[:VERDICT_MAX_LEN] + "…") if len(v) > VERDICT_MAX_LEN else v
+
+
 def _base_parse(text: str, verdict_patterns: List[str]) -> dict:
     text = text or ""
     verdict = _extract_by_patterns(text, verdict_patterns) or _fallback_verdict(text)
     return {
-        "verdict": verdict,
+        "verdict": _clip_verdict(verdict),
         "note": extract_note(text),
         "body": strip_note(text),
         "raw": text,
@@ -88,6 +99,8 @@ def parse_agent_a(text: str) -> dict:
 def parse_agent_b(text: str) -> dict:
     return _base_parse(text, [
         r"当前价¥?[\d.]+处于[：:]\s*(\S+)",
+        # 增量模式：只取"维持/更新"关键词，不要把后面整段理由抓进徽章
+        r"上次结论是否维持[：:]\s*[\[【]?\s*(维持|更新)",
         r"上次结论是否维持[：:]\s*(.+)",
     ])
 
@@ -101,6 +114,8 @@ def parse_agent_c(text: str) -> dict:
 def parse_agent_d(text: str) -> dict:
     return _base_parse(text, [
         r"行业景气度[：:]\s*(\S+)",
+        # 增量模式：只取"维持/更新"关键词，不要把后面整段理由抓进徽章
+        r"结论是否维持[：:]\s*[\[【]?\s*(维持|更新)",
         r"结论是否维持[：:]\s*(.+)",
         r"D·行业宏观（?维持/更新）?[：:]\s*(.+)",
     ])

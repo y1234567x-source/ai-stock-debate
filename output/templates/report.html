@@ -54,10 +54,12 @@
   .icon-c { background: rgba(245,158,11,.2); }
   .icon-d { background: rgba(59,130,246,.2); }
   .icon-e { background: rgba(168,85,247,.2); }
-  .agent-title { flex: 1; }
-  .agent-title strong { display: block; font-size: 14px; }
-  .agent-title span { font-size: 12px; color: var(--muted); }
-  .agent-verdict { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  /* min-width:0 + nowrap+ellipsis 让标题永不被右侧长徽章挤成竖排单字 */
+  .agent-title { flex: 1; min-width: 0; }
+  .agent-title strong { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .agent-title span { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* 徽章最多占 40% 宽度、单行截断，超长 verdict 不会破坏头部布局 */
+  .agent-verdict { flex-shrink: 0; max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
   .verdict-bullish { background: rgba(34,197,94,.15); color: var(--green); }
   .verdict-bearish { background: rgba(239,68,68,.15); color: var(--red); }
   .verdict-neutral { background: rgba(245,158,11,.15); color: var(--yellow); }
