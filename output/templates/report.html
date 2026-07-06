@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{stock_name}}({{symbol}}) 投研报告 {{date}}</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d27; --border: #2a2d3e;
+    --text: #e2e8f0; --muted: #8892a4; --accent: #6366f1;
+    --green: #22c55e; --red: #ef4444; --yellow: #f59e0b;
+    --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'PingFang SC','Microsoft YaHei',sans-serif; font-size: 14px; line-height: 1.6; }
+
+  /* 顶部价格栏 */
+  .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 32px; flex-wrap: wrap; }
+  .stock-id { font-size: 22px; font-weight: 700; }
+  .price-big { font-size: 32px; font-weight: 700; }
+  .price-change.up { color: var(--red); }
+  .price-change.down { color: var(--green); }
+  .meta-item { display: flex; flex-direction: column; }
+  .meta-label { font-size: 11px; color: var(--muted); }
+  .meta-value { font-size: 15px; font-weight: 600; }
+  .fetch-time { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  /* 决策卡 */
+  .decision-card { margin: 20px 24px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .decision-card h2 { font-size: 13px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+  .decision-item { background: #0f1117; border-radius: 8px; padding: 14px; }
+  .decision-item .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .decision-item .value { font-size: 18px; font-weight: 700; }
+  .badge { display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .badge-buy { background: rgba(34,197,94,.15); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+  .badge-sell { background: rgba(239,68,68,.15); color: var(--red); border: 1px solid rgba(239,68,68,.3); }
+  .badge-hold { background: rgba(245,158,11,.15); color: var(--yellow); border: 1px solid rgba(245,158,11,.3); }
+  .confidence-bar { height: 6px; background: var(--border); border-radius: 3px; margin-top: 6px; }
+  .confidence-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--blue)); }
+  .keypoints { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .keypoints h3 { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .keypoint { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .keypoint .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
+
+  /* Agent卡片区 */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; padding: 0 24px 24px; }
+  .agent-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .agent-header { padding: 14px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  .agent-header:hover { background: rgba(255,255,255,.03); }
+  .agent-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .icon-a { background: rgba(99,102,241,.2); }
+  .icon-b { background: rgba(34,197,94,.2); }
+  .icon-c { background: rgba(245,158,11,.2); }
+  .icon-d { background: rgba(59,130,246,.2); }
+  .icon-e { background: rgba(168,85,247,.2); }
+  .agent-title { flex: 1; }
+  .agent-title strong { display: block; font-size: 14px; }
+  .agent-title span { font-size: 12px; color: var(--muted); }
+  .agent-verdict { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+  .verdict-bullish { background: rgba(34,197,94,.15); color: var(--green); }
+  .verdict-bearish { background: rgba(239,68,68,.15); color: var(--red); }
+  .verdict-neutral { background: rgba(245,158,11,.15); color: var(--yellow); }
+  .chevron { color: var(--muted); transition: transform .2s; font-size: 12px; }
+  .agent-card.open .chevron { transform: rotate(180deg); }
+
+  .agent-body { display: none; padding: 16px; }
+  .agent-card.open .agent-body { display: block; }
+
+  /* 数据表 */
+  .data-section { margin-bottom: 16px; }
+  .data-section h4 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 8px; }
+  td { padding: 4px 8px; border-bottom: 1px solid rgba(42,45,62,.5); }
+  tr:last-child td { border-bottom: none; }
+  .num-up { color: var(--red); }
+  .num-down { color: var(--green); }
+
+  /* 推理链 */
+  .reasoning { background: #0a0c12; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+  .reasoning h4 { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .step { display: flex; gap: 10px; margin-bottom: 10px; }
+  .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: white; font-size: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .step-content { flex: 1; font-size: 13px; color: #c8d0e0; line-height: 1.7; }
+  .step-content strong { color: var(--text); }
+
+  /* Agent 原始 Markdown 输出（模型直出，经 markdown 转 HTML） */
+  .agent-md-body { font-size: 13px; color: #c8d0e0; line-height: 1.7; }
+  .agent-md-body h1, .agent-md-body h2, .agent-md-body h3, .agent-md-body h4 {
+    font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+    margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .agent-md-body h1:first-child, .agent-md-body h2:first-child, .agent-md-body h3:first-child { margin-top: 0; }
+  .agent-md-body p { margin-bottom: 8px; }
+  .agent-md-body strong { color: var(--text); }
+  .agent-md-body ul, .agent-md-body ol { padding-left: 20px; margin-bottom: 8px; }
+  .agent-md-body li { margin-bottom: 4px; }
+  .agent-md-body table { margin: 8px 0 14px; }
+  .agent-md-body code { background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* 历史记录 */
+  .history-section { padding: 0 24px 24px; }
+  .history-section h2 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .timeline { position: relative; padding-left: 20px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .timeline-item { position: relative; margin-bottom: 16px; }
+  .timeline-item::before { content: ''; position: absolute; left: -17px; top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .timeline-item .t-date { font-size: 11px; color: var(--muted); }
+  .timeline-item .t-content { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-top: 4px; font-size: 13px; }
+
+  /* 观察节点 */
+  .watchpoints { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 0 24px 24px; }
+  .watchpoint { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .watchpoint .wp-date { font-size: 12px; color: var(--accent); margin-bottom: 4px; }
+  .watchpoint .wp-event { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .watchpoint .wp-note { font-size: 12px; color: var(--muted); }
+
+  /* 分区标题 */
+  .section-title { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding: 8px 24px 12px; }
+
+  /* 笔记标签 */
+  .note-tag { display: inline-block; background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.3); color: var(--accent); font-size: 11px; padding: 2px 8px; border-radius: 4px; margin-top: 8px; }
+
+  @media (max-width: 600px) {
+    .agents-grid { grid-template-columns: 1fr; padding: 0 12px 24px; }
+    .header { padding: 12px; gap: 16px; }
+    .decision-card { margin: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 顶部价格栏 -->
+<div class="header">
+  <div>
+    <div class="stock-id">{{symbol}} · {{stock_name}}</div>
+    <div style="color:var(--muted);font-size:12px;">{{industry}}</div>
+  </div>
+  <div>
+    <div class="price-big {{price_color}}">¥{{price}}</div>
+    <div class="price-change {{price_color}}">{{change_pct}}% ({{change_amt}})</div>
+  </div>
+  <div class="meta-item"><span class="meta-label">市盈率TTM</span><span class="meta-value">{{pe}}x</span></div>
+  <div class="meta-item"><span class="meta-label">总市值</span><span class="meta-value">{{market_cap}}亿</span></div>
+  <div class="meta-item"><span class="meta-label">MA5</span><span class="meta-value">{{ma5}}</span></div>
+  <div class="meta-item"><span class="meta-label">MA20</span><span class="meta-value">{{ma20}}</span></div>
+  <div class="meta-item"><span class="meta-label">量比</span><span class="meta-value">{{vol_ratio}}</span></div>
+  <div class="fetch-time">数据时间：{{fetch_time}}</div>
+</div>
+
+<!-- E综合决策卡 -->
+<div class="decision-card">
+  <h2>E · 综合决策</h2>
+  <div class="decision-grid">
+    <div class="decision-item">
+      <div class="label">操作建议</div>
+      <div class="value"><span class="badge {{decision_badge}}">{{decision}}</span></div>
+    </div>
+    <div class="decision-item">
+      <div class="label">置信度</div>
+      <div class="value">{{confidence}}%</div>
+      <div class="confidence-bar"><div class="confidence-fill" style="width:{{confidence}}%"></div></div>
+    </div>
+    <div class="decision-item">
+      <div class="label">止损位</div>
+      <div class="value" style="color:var(--red)">{{stop_loss}}</div>
+    </div>
+    <div class="decision-item">
+      <div class="label">目标价</div>
+      <div class="value" style="color:var(--green)">{{target}}</div>
+    </div>
+  </div>
+  <div class="keypoints">
+    {{decision_points}}
+  </div>
+</div>
+
+<!-- E 完整裁决 -->
+<div class="section-title">E · 完整裁决推理</div>
+<div class="watchpoints">
+  {{watchpoints}}
+</div>
+
+<!-- 四个Agent分析卡 -->
+<div class="section-title">专家分析详情（点击展开推理链）</div>
+<div class="agents-grid">
+
+  <!-- A 新闻官 -->
+  <div class="agent-card" id="card-a">
+    <div class="agent-header" onclick="toggle('card-a')">
+      <div class="agent-icon icon-a">📰</div>
+      <div class="agent-title"><strong>A · 新闻信息官</strong><span>公告/舆情/内部人行为</span></div>
+      <span class="agent-verdict {{a_verdict_class}}">{{a_verdict}}</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="agent-body">
+      <div class="reasoning agent-md-body">{{a_body}}</div>
+      <div class="note-tag">📝 本次新增笔记：{{a_note}}</div>
+    </div>
+  </div>
+
+  <!-- B 基本面 -->
+  <div class="agent-card" id="card-b">
+    <div class="agent-header" onclick="toggle('card-b')">
+      <div class="agent-icon icon-b">📊</div>
+      <div class="agent-title"><strong>B · 基本面研究员</strong><span>财报/估值/杜邦分解</span></div>
+      <span class="agent-verdict {{b_verdict_class}}">{{b_verdict}}</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="agent-body">
+      <div class="reasoning agent-md-body">{{b_body}}</div>
+      <div class="note-tag">📝 本次新增笔记：{{b_note}}</div>
+    </div>
+  </div>
+
+  <!-- C 技术 -->
+  <div class="agent-card" id="card-c">
+    <div class="agent-header" onclick="toggle('card-c')">
+      <div class="agent-icon icon-c">📈</div>
+      <div class="agent-title"><strong>C · 技术分析师</strong><span>K线/量价/筹码/龙虎榜</span></div>
+      <span class="agent-verdict {{c_verdict_class}}">{{c_verdict}}</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="agent-body">
+      <div class="data-section">
+        <h4>原始技术数据（数据层直取，非模型生成）</h4>
+        {{c_data_table}}
+      </div>
+      <div class="reasoning agent-md-body">{{c_body}}</div>
+      <div class="note-tag">📝 本次新增笔记：{{c_note}}</div>
+    </div>
+  </div>
+
+  <!-- D 宏观 -->
+  <div class="agent-card" id="card-d">
+    <div class="agent-header" onclick="toggle('card-d')">
+      <div class="agent-icon icon-d">🌐</div>
+      <div class="agent-title"><strong>D · 行业宏观分析师</strong><span>产业链/全球局势/竞争格局</span></div>
+      <span class="agent-verdict {{d_verdict_class}}">{{d_verdict}}</span>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="agent-body">
+      <div class="reasoning agent-md-body">{{d_body}}</div>
+      <div class="note-tag">📝 本次新增笔记：{{d_note}}</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 历史决策记录 -->
+<div class="history-section">
+  <h2>历史决策记录</h2>
+  <div class="timeline">
+    {{history_timeline}}
+  </div>
+</div>
+
+<script>
+function toggle(id) {
+  const card = document.getElementById(id);
+  card.classList.toggle('open');
+}
+// 默认展开E决策卡，其他折叠
+document.addEventListener('DOMContentLoaded', () => {
+  // 可选：默认展开第一个
+});
+</script>
+</body>
+</html>

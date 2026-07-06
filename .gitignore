@@ -1,0 +1,22 @@
+# 环境配置（含 API Key，不能提交）
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# 用户运行时数据（每个用户的记忆档案/决策记录不同，不随代码库分发）
+memory/profiles/
+memory/decisions_log.json
+
+# 生成的分析报告
+output/reports/
+
+# 编辑器/系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,4 @@
+# 统一以 LF 入库，跨平台协作不产生换行符噪音
+* text=auto eol=lf
+*.png binary
+*.jpg binary
