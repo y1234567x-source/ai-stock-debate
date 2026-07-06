@@ -59,12 +59,23 @@ def _extract_by_patterns(text: str, patterns: List[str], default: str = "") -> s
     return default
 
 
+# 报告标题行（如 "C·技术分析师分析报告"、"D · 行业宏观分析师"），
+# 这类行不能当 verdict，否则徽章显示的是标题而非结论
+_TITLE_LINE_RE = re.compile(r"^[A-EＡ-Ｅ]\s*[·•・]|分析报告$|分析师$")
+
+
 def _fallback_verdict(text: str) -> str:
-    """兜底：取第一条非空、非标题、非分隔线的正文行，截断到合理长度。"""
-    for line in (text or "").splitlines():
-        line = line.strip().lstrip("*").strip()
-        if line and not line.startswith("━") and not line.startswith("【") and len(line) > 4:
-            return line[:60]
+    """兜底：取第一条有意义的正文行（跳过标题/分隔线/模板回显），截断到合理长度。"""
+    for raw in (text or "").splitlines():
+        line = raw.strip().strip("*#>━─ 　").strip("【】[]").strip()
+        # 模型有时回显模板的 "结论：xxx" 空壳，剥掉前缀看真正内容
+        line = re.sub(r"^结论\s*[：:]\s*", "", line)
+        line = line.strip("*").strip()
+        if not line or len(line) <= 4:
+            continue
+        if _TITLE_LINE_RE.search(line):
+            continue
+        return line[:60]
     return "查看详情"
 
 
@@ -81,7 +92,11 @@ def _clip_verdict(v: str) -> str:
 
 def _base_parse(text: str, verdict_patterns: List[str]) -> dict:
     text = text or ""
-    verdict = _extract_by_patterns(text, verdict_patterns) or _fallback_verdict(text)
+    # verdict 抽取用去掉加粗星号的副本：模型常把标签写成 "**操作信号**："，
+    # 中间的 ** 会把 label 和冒号隔开，导致 "操作信号：" 这类 pattern 失配，
+    # 退化到 fallback 抓到报告标题行。去星号后 A/B/C/D 各自的 pattern 才稳定命中。
+    verdict_src = text.replace("*", "")
+    verdict = _extract_by_patterns(verdict_src, verdict_patterns) or _fallback_verdict(verdict_src)
     return {
         "verdict": _clip_verdict(verdict),
         "note": extract_note(text),

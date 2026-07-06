@@ -4,8 +4,47 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agents.parsers import parse_agent_e, parse_agent_b, parse_agent_d, extract_note, strip_note, VERDICT_MAX_LEN
-from agents.prompts import build_agent_b_prompt
+from agents.parsers import (
+    parse_agent_e, parse_agent_a, parse_agent_b, parse_agent_c, parse_agent_d,
+    extract_note, strip_note, VERDICT_MAX_LEN,
+)
+from agents.prompts import build_agent_b_prompt, build_agent_e_prompt
+
+
+def test_verdict_tolerates_bold_markers_around_label():
+    # 回归：模型把标签包成 "**操作信号**：" ，** 隔开 label 和冒号，
+    # 曾导致 pattern 失配、fallback 抓到报告标题行（如 "C·技术分析师分析报告**"）
+    c = parse_agent_c("**C·技术分析师分析报告**\n\n**操作信号**：**观望（继续看空）**\n\n**本次新增笔记**：空头")
+    assert c["verdict"] == "观望（继续看空）"
+    assert "分析报告" not in c["verdict"]
+
+    d = parse_agent_d("**D·行业宏观（维持/更新）**：维持原判。\n\n**本次新增笔记**：无新增")
+    assert "维持原判" in d["verdict"]
+    assert not d["verdict"].startswith("D·")
+    assert "*" not in d["verdict"]
+
+
+def test_verdict_fallback_skips_report_title_line():
+    # 没有任何已知 verdict 关键词时，兜底也不能把报告标题行当 verdict
+    a = parse_agent_a("**A·新闻官分析报告**\n\n市场情绪偏空，无重大催化。\n\n**本次新增笔记**：偏空")
+    assert "分析报告" not in a["verdict"]
+    assert "市场情绪偏空" in a["verdict"]
+
+
+def test_e_incremental_prompt_no_none_price_leak():
+    # 回归：last_decision.target 为 None 时，prompt 里出现 "¥None"，
+    # 模型会照抄进最终输出（"更新目标价：¥None"）
+    data = {"stock": "002475", "realtime": {"最新价": 62.88}}
+    context = {
+        "analysis_mode": "intraday", "days_since_last": 0,
+        "decision_history": "h",
+        "last_decision": {"date": "2026-07-06", "price": 61.39,
+                          "decision": "观望", "confidence": 65,
+                          "stop_loss": 60.0, "target": None, "summary": "s"},
+    }
+    prompt = build_agent_e_prompt({"A": "a", "B": "b", "C": "c", "D": "d"}, data, context)
+    assert "¥None" not in prompt
+    assert "未设定目标价" in prompt or "不设定" in prompt
 
 # 模拟 DeepSeek 真实输出风格：markdown 加粗 + 正文推演里先出现一批价格数字
 E_TEXT_WITH_BODY_NUMBERS = """**E·综合决策报告**

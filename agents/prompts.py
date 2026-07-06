@@ -499,12 +499,22 @@ def build_agent_e_prompt(reports: dict, data: dict, context: dict) -> str:
         except Exception:
             pass
 
+        # 价格类字段可能为 None（如未设目标价）——不能直接拼 ¥{None}，
+        # 否则 prompt 里出现 "¥None"，模型会照抄进最终输出
+        def _price_or(v, default="未设定"):
+            return f"¥{v}" if v not in (None, "", "?") else default
+
+        stop_prev = _price_or(last.get('stop_loss'))
+        target_prev = _price_or(last.get('target'), "未设定目标价")
+
         return f"""你是独立投资决策者（Agent E）。
 
 ━━━ 上次决策回顾 ━━━
 日期：{last.get('date','?')} | 价格：¥{price_prev} | 决策：{last.get('decision','?')} | 置信度：{last.get('confidence','?')}%
-止损：¥{last.get('stop_loss','?')} | 目标：¥{last.get('target','?')}
+止损：{stop_prev} | 目标：{target_prev}
 摘要：{last.get('summary','')}
+
+（注：若本次不设目标价，请直接写"目标价：不设定"，不要输出空值占位符）
 
 ━━━ 当前状态 ━━━
 当前价格：¥{price_now}{prev_chg}
