@@ -10,9 +10,33 @@ HTML 报告输出（默认格式）。改造自 quant_debate/templates/renderer.
 """
 
 import os
+import re
 from datetime import datetime
 
 from agents.parsers import markdown_to_html
+
+
+def _plain_snippet(text: str, limit: int = 160) -> str:
+    """把含 markdown 的长文压成一行干净的纯文本摘要，用于历史时间线快速浏览。
+
+    历史时间线只做"历次决策一眼扫过去"，完整推理在上方 E 区块已展示，
+    因此这里剥掉 markdown 装饰、折叠空白、按句末标点截断成一句话摘要。
+    """
+    if not text:
+        return ""
+    t = re.sub(r"[#*_>`~]+", "", text)          # 标题/加粗/代码等行内装饰
+    t = re.sub(r"[━─=]{2,}", "", t)              # 分隔线
+    t = t.replace("【", "").replace("】", "")
+    t = re.sub(r"(?m)^\s*[-•]\s+", "", t)        # 行首列表符号（保留数字区间里的连字符）
+    t = re.sub(r"\s+", " ", t).strip()
+    if len(t) <= limit:
+        return t
+    cut = t[:limit]
+    for p in ("。", "；", "！", "？"):
+        idx = cut.rfind(p)
+        if idx > limit * 0.5:
+            return cut[:idx + 1] + " …"
+    return cut.rstrip("，、 ") + " …"
 
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "..", "templates", "report.html")
 
@@ -124,13 +148,14 @@ def _history_timeline(history: list) -> str:
             outcome_tag = '<span style="color:var(--green);font-size:11px"> ✓ 判断正确</span>'
         elif outcome == "wrong":
             outcome_tag = '<span style="color:var(--red);font-size:11px"> ✗ 判断错误</span>'
+        snippet = _plain_snippet(h.get("summary", ""))
         html += f"""<div class="timeline-item">
           <div class="t-date">{h.get('date','')[:10]}</div>
           <div class="t-content">
             <strong>{h.get('decision','?')}</strong>（置信度{h.get('confidence','?')}%）
             @ ¥{h.get('price_at_analysis','?')}
             {outcome_tag}
-            <div style="color:var(--muted);font-size:12px;margin-top:4px">{h.get('summary','')}</div>
+            <div style="color:var(--muted);font-size:12px;line-height:1.6;margin-top:6px">{snippet}</div>
           </div>
         </div>"""
     return html
